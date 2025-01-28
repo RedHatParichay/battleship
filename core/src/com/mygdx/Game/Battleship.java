@@ -19,6 +19,7 @@ public class Battleship extends Game {
 	}
 	@Override
 	public void dispose () {
-
+		batch.dispose();
+		super.dispose();
 	}
 }
