@@ -10,8 +10,7 @@ import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.mygdx.Helpers.Constants;
-
-import java.util.Random;
+import com.mygdx.Players.RandomAIPlayer;
 
 public class Battleship extends ApplicationAdapter {
 	private ShapeRenderer shapeRenderer; 	// Instantiate shape renderer
@@ -21,13 +20,14 @@ public class Battleship extends ApplicationAdapter {
 
 	// Initialise player grid
 	// 0 = empty, 1 = ship, 2 = hit, 3 = miss
-	private int[][] playerGrid = new int[Constants.GRID_SIZE][Constants.GRID_SIZE];
-	// Initialise AI grid
-	private int[][] aiGrid = new int[Constants.GRID_SIZE][Constants.GRID_SIZE];
+
+	private RandomAIPlayer aiPlayer;
+	private int[][] playerGrid;
+	private int[][] aiGrid;
+	private int[] shipSizes;
 	private boolean placingShips = true;	// Boolean to store if player has finished placing ships
 	private boolean playerTurn = true;	// Initialise player as currently playing
 	private boolean gameOver = false;	// Boolean to store game state
-	private final Random random = new Random();	// Initialise randomiser
 
 	@Override
 	public void create() {
@@ -38,7 +38,12 @@ public class Battleship extends ApplicationAdapter {
 		// Initialise camera
 		camera = new OrthographicCamera(Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
 		camera.setToOrtho(false);	// Start y-axis at the bottom-left
-		placeShipsRandomly(aiGrid);	// Place ships randomly for AI
+		aiPlayer = new RandomAIPlayer();
+
+		playerGrid = new int[Constants.GRID_SIZE][Constants.GRID_SIZE];
+		aiGrid = new int[Constants.GRID_SIZE][Constants.GRID_SIZE];
+		shipSizes = new int[]{2, 2, 3, 3, 4};
+		aiGrid = aiPlayer.placeShipsRandomly(shipSizes);	// Place ships randomly for AI
 	}
 
 	@Override
@@ -59,7 +64,6 @@ public class Battleship extends ApplicationAdapter {
 
 		for (int row = 0; row < Constants.GRID_SIZE; row++) {
 			for (int col = 0; col < Constants.GRID_SIZE; col++) {
-				//int y = (Constants.GRID_SIZE - 1 - row) * Constants.CELL_SIZE;
 
 				// Player grid
 				if (playerGrid[row][col] == 1) shapeRenderer.setColor(Color.BLUE);
@@ -109,7 +113,7 @@ public class Battleship extends ApplicationAdapter {
 		// If the player is still placing ship, keep printing prompt
 		if (placingShips) font.draw(batch, "Place Ships (Left-click). Press SPACE to Start!", 50, 500);
 		// If the game is over, check and print who won
-		else if (gameOver) font.draw(batch, (!playerTurn ? "You Win!" : "AI Wins!"), 300, 500);
+		else if (gameOver) font.draw(batch, (!playerTurn ? "AI WinS!" : "You Win!"), 300, 500);
 		else font.draw(batch, (playerTurn ? "Your Turn" : "AI's Turn"), 300, 500);
 		batch.end();
 	}
@@ -144,7 +148,8 @@ public class Battleship extends ApplicationAdapter {
 
 				playerTurn = false; // End player's turn
 				checkGameOver();
-				if (!gameOver) aiTurn(); // AI attacks back
+				if (!gameOver) playerGrid = aiPlayer.aiMove(playerGrid); // AI attacks back
+				playerTurn = true;
 			}
 		}
 
@@ -153,79 +158,6 @@ public class Battleship extends ApplicationAdapter {
 			placingShips = false; // Start game
 		}
 	}
-
-
-	private void aiTurn() {
-		int row, col;
-		do {
-			// Get randomised row and col
-			row = random.nextInt(Constants.GRID_SIZE);
-			col = random.nextInt(Constants.GRID_SIZE);
-		} while (playerGrid[row][col] >= 2); // Avoid hitting the same spot
-
-		if (playerGrid[row][col] == 1) playerGrid[row][col] = 2; // AI hit
-		else playerGrid[row][col] = 3; // AI miss
-		playerTurn = true;		// Give control back to player
-		checkGameOver();		// Check if the game is over
-	}
-
-	private void placeShipsRandomly(int[][] grid) {	// Method for AI to place ships randomly
-		// Define the ship sizes
-		int[] shipSizes = {2, 2, 3, 3, 4}; // 2x1, 2x1, 3x1, 3x1, 4x1
-
-		for (int shipSize : shipSizes) {
-			boolean placed = false;		// Method to store if current ship has been placed
-
-			while (!placed) {
-				// Randomly choose the orientation (0 for horizontal, 1 for vertical)
-				boolean horizontal = random.nextBoolean();
-
-				// Get random row and col
-				int row = random.nextInt(Constants.GRID_SIZE);
-				int col = random.nextInt(Constants.GRID_SIZE);
-
-				// Check if the ship can be placed horizontally
-				if (horizontal && col + shipSize <= Constants.GRID_SIZE) {
-					// Check if space is clear
-					boolean canPlace = true; // Store chosen position's validity
-					for (int i = 0; i < shipSize; i++) {
-						if (grid[row][col + i] != 0) {
-							canPlace = false;
-							break;
-						}
-					}
-
-					if (canPlace) {
-						// Place the ship
-						for (int i = 0; i < shipSize; i++) {
-							grid[row][col + i] = 1;
-						}
-						placed = true;
-					}
-				}
-				// Check if the ship can be placed vertically
-				else if (!horizontal && row + shipSize <= Constants.GRID_SIZE) {
-					// Check if space is clear
-					boolean canPlace = true;
-					for (int i = 0; i < shipSize; i++) {
-						if (grid[row + i][col] != 0) {
-							canPlace = false;
-							break;
-						}
-					}
-
-					if (canPlace) {
-						// Place the ship
-						for (int i = 0; i < shipSize; i++) {
-							grid[row + i][col] = 1;
-						}
-						placed = true;
-					}
-				}
-			}
-		}
-	}
-
 
 	private void checkGameOver() {	// Method to check if the game is over
 		boolean playerAlive = false, aiAlive = false;
