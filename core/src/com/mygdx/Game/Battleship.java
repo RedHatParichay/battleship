@@ -17,14 +17,10 @@ public class Battleship extends ApplicationAdapter {
 	private SpriteBatch batch; // Instantiate sprite batch
 	private BitmapFont font; // Instantiate bitmap font
 	private OrthographicCamera camera;	// Instantiate camera
-
-	// Initialise player grid
-	// 0 = empty, 1 = ship, 2 = hit, 3 = miss
-
-	private RandomAIPlayer aiPlayer;
-	private int[][] playerGrid;
-	private int[][] aiGrid;
-	private int[] shipSizes;
+	private RandomAIPlayer aiPlayer;	// Instantiate AI player
+	private int[][] playerGrid;	// Instantiate player grid
+	private int[][] aiGrid;		// Instantiate AI grid
+	private int[] shipSizes;	// Array to store ship size
 	private boolean placingShips = true;	// Boolean to store if player has finished placing ships
 	private boolean playerTurn = true;	// Initialise player as currently playing
 	private boolean gameOver = false;	// Boolean to store game state
@@ -148,7 +144,8 @@ public class Battleship extends ApplicationAdapter {
 
 				playerTurn = false; // End player's turn
 				checkGameOver();
-				if (!gameOver) playerGrid = aiPlayer.aiMove(playerGrid); // AI attacks back
+				int[] result = aiPlayer.aiMove(playerGrid); // AI attacks back
+				if (!gameOver) playerGrid[result[0]][result[1]] = result[2];
 				playerTurn = true;
 			}
 		}

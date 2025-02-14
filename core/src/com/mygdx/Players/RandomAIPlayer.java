@@ -52,7 +52,7 @@ public class RandomAIPlayer {
                     boolean canPlace = true;
                     for (int i = 0; i < shipSize; i++) {
                         if (aiGrid[row + i][col] != 0) {
-                            canPlace = false;
+                            canPlace = false; // Update if
                             break;
                         }
                     }
@@ -70,18 +70,59 @@ public class RandomAIPlayer {
 
         return aiGrid;
     }
+    // 0 = empty, 1 = ship, 2 = hit, 3 = miss
+    public int[] aiMove(int[][] playerGrid) {
+        int row = -1, col = -1;
 
-    public int[][] aiMove(int[][] playerGrid) {
-        int row, col;
-        do {
-            // Get randomised row and col
-            row = random.nextInt(Constants.GRID_SIZE);
-            col = random.nextInt(Constants.GRID_SIZE);
-        } while (playerGrid[row][col] >= 2); // Avoid hitting the same spot
+        // Check for existing hits (Local search Mode)
+        for (int r = 0; r < Constants.GRID_SIZE; r++) {
+            for (int c = 0; c < Constants.GRID_SIZE; c++) {
+                if (playerGrid[r][c] == 2) { // If AI has already hit a ship
+                    // Try attacking adjacent cells
+                    // Left, Right, Down, Up
+                    int[][] directions = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+                    for (int[] dir : directions) {
+                        // Update row movement according to direction
+                        int newRow = r + dir[0];
+                        // Update column movement according to direction
+                        int newCol = c + dir[1];
 
-        if (playerGrid[row][col] == 1) playerGrid[row][col] = 2; // AI hit
-        else playerGrid[row][col] = 3; // AI miss
+                        // Check if current move is valid, if it is
+                        if (isValidMove(newRow, newCol, playerGrid)) {
+                            row = newRow;   // Update row
+                            col = newCol;   // Update column
+                            break;
+                        }
+                    }
+                }
+            }
+            if (row != -1) break; // Exit loop if a move is found
+        }
 
-        return playerGrid;
+        // If no adjacent moves found, pick randomly (Exploration Mode)
+        if (row == -1 || col == -1) {
+            do {
+                // Randomly generate moves in range of grid size
+                row = random.nextInt(Constants.GRID_SIZE);
+                col = random.nextInt(Constants.GRID_SIZE);
+            } while (playerGrid[row][col] >= 2); // Avoid hitting the same spot
+        }
+
+        int result;
+        // Apply move (Hit or Miss)
+        if (playerGrid[row][col] == 1) {
+            result = 2; // AI hit
+        } else {
+            result = 3; // AI miss
+        }
+        playerGrid[row][col] = result;
+        return new int[]{row, col, result};
+    }
+
+    // Helper function to check if move is valid
+    private boolean isValidMove(int row, int col, int[][] grid) {
+        return row >= 0 && row < Constants.GRID_SIZE &&
+                col >= 0 && col < Constants.GRID_SIZE &&
+                grid[row][col] < 2; // Must be unvisited
     }
 }
