@@ -27,7 +27,7 @@ public class Battleship extends ApplicationAdapter {
 	private boolean placingShips = true;	// Boolean to store if player has finished placing ships
 	private boolean playerTurn = true;	// Initialise player as currently playing
 	private boolean gameOver = false;	// Boolean to store game state
-	private Random random = new Random();	// Initialise randomiser
+	private final Random random = new Random();	// Initialise randomiser
 
 	@Override
 	public void create() {
@@ -47,81 +47,58 @@ public class Battleship extends ApplicationAdapter {
 		camera.update();
 		batch.setProjectionMatrix(camera.combined);
 
-		drawGrids(); 	// 	Draw player and AI grids
-		drawShips();	//	Draw ships
+		drawGameBoard(); //	Draw player and AI grids
+		drawGridLines(); // Draw grids
 		drawText();		//	Draw instruction text
 
 		if (!gameOver) handleInput();	// If the game is not over, keep handling input
 	}
 
-	private void drawGrids() {	// Method to draw player's and AI's grids
+	private void drawGameBoard() {
 		shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
 
-		// Player grid (left side)
 		for (int row = 0; row < Constants.GRID_SIZE; row++) {
 			for (int col = 0; col < Constants.GRID_SIZE; col++) {
-				if (playerGrid[row][col] == 1) shapeRenderer.setColor(Color.BLUE); // Player's ship
-				else if (playerGrid[row][col] == 2) shapeRenderer.setColor(Color.RED); // Hit ship
-				else if (playerGrid[row][col] == 3) shapeRenderer.setColor(Color.GRAY); // Miss
-				else shapeRenderer.setColor(Color.WHITE); // Empty
+				//int y = (Constants.GRID_SIZE - 1 - row) * Constants.CELL_SIZE;
 
+				// Player grid
+				if (playerGrid[row][col] == 1) shapeRenderer.setColor(Color.BLUE);
+				else if (playerGrid[row][col] == 2) shapeRenderer.setColor(Color.RED);
+				else if (playerGrid[row][col] == 3) shapeRenderer.setColor(Color.GRAY);
+				else shapeRenderer.setColor(Color.WHITE);
 				shapeRenderer.rect(col * Constants.CELL_SIZE, row * Constants.CELL_SIZE, Constants.CELL_SIZE, Constants.CELL_SIZE);
-			}
-		}
+				//shapeRenderer.rect(col * Constants.CELL_SIZE, y, Constants.CELL_SIZE, Constants.CELL_SIZE);
 
-		// AI grid (right side)
-		for (int row = 0; row < Constants.GRID_SIZE; row++) {
-			for (int col = 0; col < Constants.GRID_SIZE; col++) {
-				int aiCol = col + 12; // Shift AI grid to the right
+				// AI grid
+				int aiCol = col + Constants.AI_GRID_OFFSET;
 				if (aiGrid[row][col] == 2) shapeRenderer.setColor(Color.RED); // Hit AI ship
 				else if (aiGrid[row][col] == 3) shapeRenderer.setColor(Color.GRAY); // Miss
-				else shapeRenderer.setColor(Color.WHITE); // Hidden ships
-
-				// Draw rectangle
+				else shapeRenderer.setColor(Color.WHITE); // Hidden AI ships
 				shapeRenderer.rect(aiCol * Constants.CELL_SIZE, row * Constants.CELL_SIZE, Constants.CELL_SIZE, Constants.CELL_SIZE);
 			}
 		}
 
 		shapeRenderer.end();
+	}
 
-		// Draw grid lines (above the filled cells)
+	private void drawGridLines() {
 		shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
 		shapeRenderer.setColor(Color.BLACK);
 
-		// Draw horizontal lines
 		for (int i = 0; i <= Constants.GRID_SIZE; i++) {
-			// Player grid (left side)
-			shapeRenderer.line(0, i * Constants.CELL_SIZE, Constants.GRID_SIZE * Constants.CELL_SIZE, i * Constants.CELL_SIZE);
-			// AI grid (right side)
-			shapeRenderer.line(12 * Constants.CELL_SIZE, i * Constants.CELL_SIZE, (12 + Constants.GRID_SIZE) * Constants.CELL_SIZE, i * Constants.CELL_SIZE);
+			int xOffset = Constants.AI_GRID_OFFSET * Constants.CELL_SIZE;
+
+			// Horizontal lines
+			int y = i * Constants.CELL_SIZE;
+			shapeRenderer.line(0, y, Constants.GRID_SIZE * Constants.CELL_SIZE, y);
+			shapeRenderer.line(xOffset, y, xOffset + Constants.GRID_SIZE * Constants.CELL_SIZE, y);
+
+			// Vertical lines
+			int x = i * Constants.CELL_SIZE;
+			shapeRenderer.line(x, 0, x, Constants.GRID_SIZE * Constants.CELL_SIZE);
+			shapeRenderer.line(xOffset + x, 0, xOffset + x, Constants.GRID_SIZE * Constants.CELL_SIZE);
 		}
 
-		// Draw vertical lines
-		for (int i = 0; i <= Constants.GRID_SIZE; i++) {
-			// Player grid (left side)
-			shapeRenderer.line(i * Constants.CELL_SIZE, 0, i * Constants.CELL_SIZE, Constants.GRID_SIZE * Constants.CELL_SIZE);
-			// AI grid (right side)
-			shapeRenderer.line(12 * Constants.CELL_SIZE + i * Constants.CELL_SIZE, 0, 12 * Constants.CELL_SIZE + i * Constants.CELL_SIZE, Constants.GRID_SIZE * Constants.CELL_SIZE);
-		}
-
-		shapeRenderer.end();
-	}
-
-	private void drawShips() {
-		shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
-		for (int row = 0; row < Constants.GRID_SIZE; row++) {
-			for (int col = 0; col < Constants.GRID_SIZE; col++) {
-
-				// 0 = empty, 1 = ship, 2 = hit, 3 = miss
-				//
-				if (playerGrid[row][col] == 1) shapeRenderer.setColor(Color.BLUE);
-				else if (playerGrid[row][col] == 2) shapeRenderer.setColor(Color.RED);
-				else if (playerGrid[row][col] == 3) shapeRenderer.setColor(Color.GRAY);
-				else continue;
-				// Draw rectangle
-				shapeRenderer.rect(col * Constants.CELL_SIZE, row * Constants.CELL_SIZE, Constants.CELL_SIZE, Constants.CELL_SIZE);
-			}
-		}
 		shapeRenderer.end();
 	}
 
@@ -149,8 +126,8 @@ public class Battleship extends ApplicationAdapter {
 			if (placingShips && col < Constants.GRID_SIZE && row < Constants.GRID_SIZE && playerGrid[row][col] == 0) {
 				playerGrid[row][col] = 1;  // Player places ships
 			}
-			else if (!placingShips && playerTurn && col >= 12 && col < 12 + Constants.GRID_SIZE && row < Constants.GRID_SIZE) {
-				int aiCol = col - 12; // Adjust for AI's grid position
+			else if (!placingShips && playerTurn && col >= Constants.AI_GRID_OFFSET && col < Constants.AI_GRID_OFFSET + Constants.GRID_SIZE && row < Constants.GRID_SIZE) {
+				int aiCol = col - Constants.AI_GRID_OFFSET; // Adjust for AI's grid position
 
 				// If the position has already been hit or missed, do nothing
 				if (aiGrid[row][aiCol] == 2 || aiGrid[row][aiCol] == 3) {
