@@ -1,6 +1,5 @@
 ## Java
 
-*.bin
 *.class
 *.war
 *.ear
@@ -92,6 +91,7 @@ nb-configuration.xml
 
 ## Gradle
 
+.gradle
 /local.properties
 .gradle/
 gradle-app.setting
