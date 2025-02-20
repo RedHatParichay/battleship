@@ -1,6 +1,7 @@
 package com.mygdx.Players;
 
 import com.mygdx.Helpers.Constants;
+
 import java.util.Random;
 
 public class RandomAIPlayer {
