@@ -52,7 +52,7 @@ public class ShipPlacement {    // Chromosome - grid of ship placements
         }
     }
     // Evaluate quality of a grid of ship placements
-    public void evaluateFitness() {
+    public int evaluateFitness() {
         int score = 0;
         for (int[] ship : ships) {
             int x = ship[0], y = ship[1], size = ship[2];
@@ -67,10 +67,15 @@ public class ShipPlacement {    // Chromosome - grid of ship placements
             }
         }
         this.fitness = score;
+        return this.fitness;
     }
 
     public int getFitness() {
         return fitness;
+    }
+
+    public void setFitness(int fitness) {
+        this.fitness = fitness;
     }
 
     public List<int[]> getShips() {
