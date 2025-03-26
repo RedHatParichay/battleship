@@ -1,130 +1,229 @@
 package com.mygdx.ParallelGeneticAlg;
 
-import com.mygdx.GeneticAlgorithm.ShipPlacement;
+
+import com.mygdx.Helpers.ShipPlacement;
 import com.mygdx.Helpers.Constants;
-import com.sun.org.apache.bcel.internal.Const;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 import java.util.concurrent.*;
-
-import static com.mygdx.Helpers.Constants.GRID_SIZE;
-import static com.mygdx.Helpers.Constants.NUM_SHIPS;
 
 public class ParallelGeneticAlgorithm {
     // Initialize a thread pool for parallelism
     private ExecutorService executorService;
-    private double mutationRate = 0.1; // 10% mutation chance
-    private int gridSize = 10;
-    private int[] shipSizes = {2, 2, 3, 3, 4};
+    private Queue<Double> last10GenerationsFitness = new LinkedList<>();
+    private static final int HISTORY_SIZE = 10;
 
-    // Method to initialize the population with random ship placements
-    private List<ShipPlacement> initializePopulation() {
+    // Main PGA loop
+    public ShipPlacement run() {
+        List<ShipPlacement> population = generateInitialPopulation();
+
+        // Create an executor service for parallel execution
+        // Reduce number of available processors by 3
+        int noOfThreads = Runtime.getRuntime().availableProcessors() - 1;
+        System.out.println(noOfThreads);
+        executorService = Executors.newFixedThreadPool(noOfThreads);
+
+        for (int gen = 0; gen < Constants.GENERATIONS; gen++) {
+            long startTime = System.nanoTime();
+
+            // Compute statistics
+            double totalFitness = 0;
+            int bestFitness = Integer.MIN_VALUE;
+
+            //ShipPlacement bestIndividual = null;
+
+            for (ShipPlacement individual : population) {
+                totalFitness += individual.getFitness();
+                if (individual.getFitness() > bestFitness) {
+                    bestFitness = individual.getFitness();
+                    //bestIndividual = individual;
+                }
+            }
+
+            double avgFitness = totalFitness / population.size();
+
+            // Print generation statistics
+            System.out.println("\n***** Running generation " + gen + " *****");
+            System.out.printf("Population's average fitness: %.5f\n", avgFitness);
+            System.out.printf("Best fitness: %d\n", bestFitness);
+
+            // Termination strategy
+            if (checkIfTerminate(avgFitness)) {
+                System.out.println("Termination condition met");
+                break;
+            }
+
+            // Evolution Step
+            // Create next population
+            List<ShipPlacement> newPopulation = new ArrayList<>();
+
+            for (int i = 0; i < Constants.POPULATION_SIZE / 2; i++) {
+                ShipPlacement parent1 = selectParent(population);
+                ShipPlacement parent2 = selectParent(population);
+                ShipPlacement child = crossover(parent1, parent2);  // Create new individuals via crossover
+                //child = mutate(child);      // Mutate child
+                newPopulation.add(child);
+            }
+
+            // Mutate individuals in parallel
+            List<Callable<ShipPlacement>> mutationTasks = new ArrayList<>();
+            for (ShipPlacement child : newPopulation) {
+                mutationTasks.add(() -> {
+                    mutate(child);
+                    return child;
+                });
+            }
+            // Invoke all mutations in parallel
+            try {
+                List<Future<ShipPlacement>> mutatedResults = executorService.invokeAll(mutationTasks);
+                newPopulation.clear();
+                for (Future<ShipPlacement> future : mutatedResults) {
+                    newPopulation.add(future.get());
+                }
+            } catch (InterruptedException | ExecutionException e) {
+                e.printStackTrace();
+            }
+
+            // Evaluate fitness of the current population in parallel
+            List<Callable<Integer>> tasks = new ArrayList<>();
+            for (ShipPlacement placement : population) {
+                tasks.add(new Callable<Integer>() {
+                    @Override
+                    public Integer call() {
+                        return placement.evaluateFitness();
+                    }
+                });
+            }
+            try {
+                // Invoke all fitness evaluations in parallel
+                List<Future<Integer>> results = executorService.invokeAll(tasks);
+                for (int i = 0; i < results.size(); i++) {
+                    try {
+                        population.get(i).setFitness(results.get(i).get());
+                    } catch (InterruptedException | ExecutionException e) {
+                        e.printStackTrace();
+                    }
+                }
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
+            population.sort(Comparator.comparingInt(ShipPlacement::getFitness).reversed());
+            ShipPlacement bestIndividual = population.get(0).copy();
+
+            // Merge and trim population
+            population.addAll(newPopulation);
+
+            // Elitism: carry over the best individual
+            population.add(bestIndividual);
+
+            population.sort(Comparator.comparingInt(ShipPlacement::getFitness).reversed());
+            population = population.subList(0, Constants.POPULATION_SIZE);
+
+            long endTime = System.nanoTime(); // End timer
+            double generationTime = (endTime - startTime) / 1_000_000_000.0; // Convert nanoseconds to seconds
+            System.out.printf("Generation time: %.3f sec\n", generationTime);
+
+        }
+
+        return population.get(0); // Best ship layout
+    }
+
+    private boolean checkIfTerminate(double newAvgFitness) {
+        // Maintain only the last 10 generations
+        if (last10GenerationsFitness.size() >= 10) {
+            last10GenerationsFitness.poll(); // Remove oldest value
+        }
+        last10GenerationsFitness.add(newAvgFitness);
+
+        // Check only if we have at least 10 values
+        if (last10GenerationsFitness.size() == HISTORY_SIZE) {
+            double firstFitness = last10GenerationsFitness.peek(); // Oldest fitness
+
+            return Math.abs(newAvgFitness - firstFitness) <= Constants.FITNESS_THRESHOLD;
+        }
+        return false;
+    }
+
+    // Population - set of ship placements
+    private List<ShipPlacement> generateInitialPopulation() {
         List<ShipPlacement> population = new ArrayList<>();
         for (int i = 0; i < Constants.POPULATION_SIZE; i++) {
-            population.add(new ShipPlacement(NUM_SHIPS, shipSizes));
+            population.add(new ShipPlacement(Constants.GRID_SIZE, Constants.SHIP_SIZES));
         }
         return population;
     }
 
-    // Method to evaluate the fitness of the population in parallel
-
-    private void evaluateFitness(List<ShipPlacement> population) {
-        List<Callable<Integer>> tasks = new ArrayList<>();
-        for (ShipPlacement placement : population) {
-            tasks.add(new Callable<Integer>() {
-                @Override
-                public Integer call() {
-                    return placement.evaluateFitness();
-                }
-            });
-        }
-        try {
-            // Invoke all fitness evaluations in parallel
-            List<Future<Integer>> results = executorService.invokeAll(tasks);
-            for (int i = 0; i < results.size(); i++) {
-                try {
-                    population.get(i).setFitness(results.get(i).get());
-                } catch (InterruptedException | ExecutionException e) {
-                    e.printStackTrace();
-                }
-            }
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-    }
-
-    // Crossover operator
-
     // Combining parts of ships placements to create new ship placement
+    /*Goal: Combine parts of two parents to create a child solution.
+    How It Works:
+    The child starts as a copy of p1.
+    A random ship from p2 replaces the corresponding ship in the child.
+    Only swaps one ship per crossover operation.*/
     private ShipPlacement crossover(ShipPlacement p1, ShipPlacement p2) {
         ShipPlacement child = p1.copy();
         Random rand = new Random();
+
         if (!p2.getShips().isEmpty()) {
             int index = rand.nextInt(p2.getShips().size());
-            child.getShips().set(index, p2.getShips().get(index));
+            int[] ship = p2.getShips().get(index);
+
+            // Try placing the ship from p2 into the child
+            if (child.canPlaceShip(ship[0], ship[1], ship[2], ship[3] == 1, Constants.GRID_SIZE)) {
+                child.getShips().set(index, ship);
+                child.placeShip(ship[0], ship[1], ship[2], ship[3] == 1);
+            }
         }
         return child;
     }
 
-    // Mutation operator
-    private void mutate(ShipPlacement placement) {
+    // Randomly slightly modifying a ship's position
+    private ShipPlacement mutate(ShipPlacement placement) {
         Random rand = new Random();
-        if (rand.nextDouble() < mutationRate) {
+        if (rand.nextDouble() < Constants.MUTATION_RATE) {
             int index = rand.nextInt(placement.getShips().size());
             int[] ship = placement.getShips().get(index);
-            ship[0] = rand.nextInt(gridSize);
-            ship[1] = rand.nextInt(gridSize);
-            placement.getShips().set(index, ship);
+
+            // Generate a new valid position
+            for (int attempts = 0; attempts < 10; attempts++) { // Avoid infinite loops
+                int newX = rand.nextInt(Constants.GRID_SIZE);
+                int newY = rand.nextInt(Constants.GRID_SIZE);
+
+                if (placement.canPlaceShip(newX, newY, ship[2], ship[3] == 1, Constants.GRID_SIZE)) {
+                    ship[0] = newX;
+                    ship[1] = newY;
+                    placement.getShips().set(index, ship);
+                    placement.placeShip(newX, newY, ship[2], ship[3] == 1);
+                    break; // Stop once a valid placement is found
+                }
+            }
         }
+        return placement;
     }
 
-    // Main GA loop
-    public ShipPlacement run() {
-        // Initialize population
-        List<ShipPlacement> population = initializePopulation();
+    private ShipPlacement selectParent(List<ShipPlacement> population) {
+        Random rand = new Random();
+        double totalFitness = population.stream().mapToDouble(ShipPlacement::getFitness).sum();
 
-        // Create an executor service for parallel execution
-        executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+        // Compute cumulative probabilities
+        double[] cumulativeProbabilities = new double[population.size()];
+        double cumulativeSum = 0;
 
-        // Run for a set number of generations
-        for (int generation = 0; generation < Constants.GENERATIONS; generation++) {
-            System.out.println("Generation: " + generation);
-
-            // Evaluate fitness of the current population in parallel
-            evaluateFitness(population);
-
-            // Sort the population by fitness
-            population.sort(new Comparator<ShipPlacement>() {
-                @Override
-                public int compare(ShipPlacement o1, ShipPlacement o2) {
-                    return Integer.compare(o2.getFitness(), o1.getFitness()); // Reverse order (highest first)
-                }
-            });
-            // Create next generation
-            List<ShipPlacement> nextGeneration = new ArrayList<>();
-
-            // Elitism: carry over the best individuals
-            nextGeneration.add(population.get(0)); // Best individual (elitism)
-
-            // Create new individuals via crossover and mutation
-            for (int i = 1; i < Constants.POPULATION_SIZE; i++) {
-                ShipPlacement parent1 = population.get(i % Constants.POPULATION_SIZE); // Select parent
-                ShipPlacement parent2 = population.get((i + 1) % Constants.POPULATION_SIZE);
-                ShipPlacement child = crossover(parent1, parent2);
-                mutate(child);
-                nextGeneration.add(child);
-            }
-
-            // Set the next generation as the current population
-            population = nextGeneration;
+        for (int i = 0; i < population.size(); i++) {
+            cumulativeSum += (double) population.get(i).getFitness() / totalFitness;
+            cumulativeProbabilities[i] = cumulativeSum;
         }
 
-        // Shutdown the executor service
-        executorService.shutdown();
+        // Select a random value in [0,1]
+        double selectionPoint = rand.nextDouble();
 
-        return population.get(0);
+        // Find the first individual whose cumulative probability surpasses selectionPoint
+        for (int i = 0; i < population.size(); i++) {
+            if (selectionPoint <= cumulativeProbabilities[i]) {
+                return population.get(i);
+            }
+        }
+
+        return population.get(population.size() - 1); // Fallback in case of precision issues
     }
 }

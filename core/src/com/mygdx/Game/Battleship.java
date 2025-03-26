@@ -10,7 +10,7 @@ import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.mygdx.Helpers.Constants;
-import com.mygdx.Players.RandomAIPlayer;
+import com.mygdx.RandomAI.RandomAIPlayer;
 
 public class Battleship extends ApplicationAdapter {
 	private ShapeRenderer shapeRenderer; 	// Instantiate shape renderer

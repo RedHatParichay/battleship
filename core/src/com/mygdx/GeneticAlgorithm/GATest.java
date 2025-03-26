@@ -1,26 +1,68 @@
 package com.mygdx.GeneticAlgorithm;
 
+import com.mygdx.Helpers.Constants;
+import com.mygdx.Helpers.ShipPlacement;
+
+import java.util.Arrays;
+
+import static com.mygdx.RandomAI.RandomAIPlacementTest.writeToCSV;
+
 public class GATest {
     public static void main(String[] args) {
-        int numRuns = 500; // Number of times to run GA
+        String filePath = "core/src/com/mygdx/Experiments/Expt6.csv";
+        // Writing headers to CSV
+        //writeToCSV(filePath, new String[]{"Run", "Algorithm", "Evaluation No", "Grid Size", "Ship Sizes", "Generations", "Population Size", "Mutation Rate", "Fitness Score", "Time Taken For Run"});
         GeneticAlgorithm ga = new GeneticAlgorithm();
 
-        for (int i = 1; i <= numRuns; i++) {
-            System.out.println("Run #" + i);
-            ShipPlacement bestPlacement = ga.run();
-            printGrid(bestPlacement);
-            System.out.println("Best Fitness: " + bestPlacement.getFitness());
-            System.out.println("----------------------------------");
+        // Running experiments
+        for (int i = 1; i <= Constants.NUM_RUNS; i++) {
+            System.out.println("\nRun #" + i);
+
+            long runStartTime = System.nanoTime();
+            // Run the GA for n evaluations
+            for (int eval = 1; eval <= Constants.EVALUATIONS; eval++) {
+                long evalStartTime = System.nanoTime();
+
+                ShipPlacement bestPlacement = ga.run();
+                int fitness = bestPlacement.evaluateFitness();
+
+                long evalEndTime = System.nanoTime(); // End timer
+                double evalTime = (evalEndTime - evalStartTime) / 1_000_000_000.0; // Convert nanoseconds to seconds
+
+
+                printGrid(bestPlacement);
+                System.out.println("Best Overall Fitness: " + fitness);
+                System.out.println("----------------------------------");
+
+                String[] result = {
+                        String.valueOf(i),
+                        "GA",
+                        String.valueOf(eval),
+                        String.valueOf(Constants.GRID_SIZE),
+                        Arrays.toString(Constants.SHIP_SIZES),
+                        String.valueOf(Constants.GENERATIONS),
+                        String.valueOf(Constants.POPULATION_SIZE),
+                        String.valueOf(Constants.MUTATION_RATE),
+                        String.valueOf(fitness),
+                        String.valueOf(evalTime)
+                };
+
+                writeToCSV(filePath, result);
+            }
+
+            long runEndTime = System.nanoTime(); // End timer
+            double runTime = (runEndTime - runStartTime) / 1_000_000_000.0; // Convert nanoseconds to seconds
+            System.out.printf("Run time: %.3f sec\n", runTime);
         }
+
     }
 
     private static void printGrid(ShipPlacement placement) {
-        int gridSize = 10;
-        char[][] displayGrid = new char[gridSize][gridSize];
+        char[][] displayGrid = new char[Constants.GRID_SIZE][Constants.GRID_SIZE];
 
         // Initialize grid with empty spaces
-        for (int i = 0; i < gridSize; i++) {
-            for (int j = 0; j < gridSize; j++) {
+        for (int i = 0; i < Constants.GRID_SIZE; i++) {
+            for (int j = 0; j < Constants.GRID_SIZE; j++) {
                 displayGrid[i][j] = '.';
             }
         }
@@ -32,12 +74,12 @@ public class GATest {
 
             // Check if ship goes out of bounds
             if (horizontal) {
-                if (x + size > gridSize) {
+                if (x + size > Constants.GRID_SIZE) {
                     System.out.println("Ship placement goes out of bounds horizontally at x: " + x + ", size: " + size);
                     continue;
                 }
             } else {
-                if (y + size > gridSize) {
+                if (y + size > Constants.GRID_SIZE) {
                     System.out.println("Ship placement goes out of bounds vertically at y: " + y + ", size: " + size);
                     continue;
                 }
@@ -49,7 +91,7 @@ public class GATest {
                 displayGrid[newY][newX] = 'S';
 
                 // Check again to ensure we're within bounds
-                if (newX >= gridSize || newY >= gridSize) {
+                if (newX >= Constants.GRID_SIZE || newY >= Constants.GRID_SIZE) {
                     System.out.println("Out of bounds while placing ship at x: " + newX + ", y: " + newY);
                     continue;
                 }

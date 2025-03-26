@@ -1,43 +1,44 @@
-package com.mygdx.ParallelGeneticAlg;
+package com.mygdx.RandomAI;
 
 import com.mygdx.Helpers.Constants;
 import com.mygdx.Helpers.ShipPlacement;
 
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.Arrays;
 
-import static com.mygdx.RandomAI.RandomAIPlacementTest.writeToCSV;
-
-public class PGATest {
+public class RandomAIPlacementTest {
     public static void main(String[] args) {
-        String filePath = "core/src/com/mygdx/Experiments/Expt6.csv";
+
+        String filePath = "core/src/com/mygdx/Experiments/Expt4.csv";
+
         // Writing headers to CSV
-        //writeToCSV(filePath, new String[]{"Run", "Algorithm", "Evaluation No", "Grid Size", "Ship Sizes", "Generations", "Population Size", "Mutation Rate", "Fitness Score", "Time Taken For Run"});
-        ParallelGeneticAlgorithm pga = new ParallelGeneticAlgorithm();
+        writeToCSV(filePath, new String[]{"Run", "Algorithm", "Evaluation No", "Grid Size", "Ship Sizes", "Generations", "Population Size", "Mutation Rate", "Fitness Score", "Time Taken For Run"});
 
         // Running experiments
         for (int i = 1; i <= Constants.NUM_RUNS; i++) {
             System.out.println("\nRun #" + i);
 
             long runStartTime = System.nanoTime();
-
-            for (int eval = 1; eval <= Constants.EVALUATIONS; eval++) {
+            // Run the Random AI for n evaluations
+            for (int j = 1; j <= Constants.EVALUATIONS; j++) {
                 long evalStartTime = System.nanoTime();
 
-                ShipPlacement bestPlacement = pga.run();
-
-                int fitness = bestPlacement.evaluateFitness();
+                ShipPlacement shipPlacement = new ShipPlacement(Constants.GRID_SIZE, Constants.SHIP_SIZES);
+                int fitness = shipPlacement.evaluateFitness();
 
                 long evalEndTime = System.nanoTime(); // End timer
                 double evalTime = (evalEndTime - evalStartTime) / 1_000_000_000.0; // Convert nanoseconds to seconds
 
-                printGrid(bestPlacement);
-                System.out.println("Best Overall Fitness: " + bestPlacement.getFitness());
-                System.out.println("----------------------------------");
 
+                printGrid(shipPlacement);
+                System.out.println("Best Overall Fitness: " + fitness);
+                System.out.println("----------------------------------");
                 String[] result = {
                         String.valueOf(i),
-                        "PGA",
-                        String.valueOf(eval),
+                        "Random AI",
+                        String.valueOf(j),
                         String.valueOf(Constants.GRID_SIZE),
                         Arrays.toString(Constants.SHIP_SIZES),
                         String.valueOf(Constants.GENERATIONS),
@@ -49,12 +50,19 @@ public class PGATest {
 
                 writeToCSV(filePath, result);
             }
-
-            long runEndTime = System.nanoTime(); // End timer
-
-            double runTime = (runEndTime - runStartTime) / 1_000_000_000.0; // Convert nanoseconds to seconds
+            long endRunTime = System.nanoTime(); // End timer
+            double runTime = (endRunTime - runStartTime) / 1_000_000_000.0; // Convert nanoseconds to seconds
             System.out.printf("Run time: %.3f sec\n", runTime);
+        }
+    }
 
+    public static void writeToCSV(String filePath, String[] data) {
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(filePath, true))) {
+            // Join the array into a single line and write to the file
+            writer.write(String.join(": ", data));
+            writer.newLine();  // New line after each data entry
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 
